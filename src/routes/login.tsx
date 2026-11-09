@@ -11,6 +11,8 @@ export const Route = createFileRoute("/login")({
     { name: "description", content: "دخول الإدارة العليا للوحة فولي" },
     { property: "og:title", content: "تسجيل الدخول — لوحة إدارة فولي" },
     { property: "og:description", content: "دخول الإدارة العليا للوحة فولي" },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
   ] }),
   component: Login,
 });
