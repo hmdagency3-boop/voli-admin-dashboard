@@ -4,6 +4,7 @@
 -- The member app must report a stable device_id via voli_report_device on sign-in/open.
 -- Device IDs/carriers are client reports, NOT hardware attestation. IPs depend on trusted proxy headers.
 begin;
+select pg_catalog.pg_advisory_xact_lock(160016);
 
 create sequence if not exists public.voli_ban_code_seq start with 200 minvalue 200;
 revoke all on sequence public.voli_ban_code_seq from public, anon, authenticated;
@@ -167,6 +168,31 @@ language sql stable security definer set search_path = '' as $$
   order by b.code limit 1;
 $$;
 
+create or replace function public.voli_account_ban_json(p_auth uuid) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object('kind',b.kind,'value',b.value,'reason',b.reason,'code',b.code,'until',b.until)
+  from public.voli_ban_accounts a join public.voli_bans b on b.id = a.ban_id where a.auth_id = p_auth
+  and b.revoked_at is null and (b.until is null or b.until > now()) order by b.until desc nulls first,b.code limit 1;
+$$;
+revoke all on function public.voli_account_ban_json(uuid) from public, anon, authenticated;
+
+create or replace function public.admin_list_devices(p_q text default null,p_limit integer default 50,p_offset integer default 0)
+returns jsonb language plpgsql stable security definer set search_path = '' as $$
+declare me uuid := public.admin_guard(); q text := nullif(btrim(coalesce(p_q,'')),''); result jsonb;
+begin
+  with filtered as (
+    select d.*,p.display_name,p.public_id,
+      coalesce(public.voli_account_ban_json(d.auth_id),public.voli_find_device_ban(d.ip,d.device_id,d.carrier)) as ban
+    from public.member_devices d left join public.profiles p on p.auth_id = d.auth_id
+    where q is null or host(d.ip) like q || '%' or d.device_id ilike '%' || q || '%' or d.model ilike '%' || q || '%'
+      or d.brand ilike '%' || q || '%' or d.carrier ilike '%' || q || '%' or p.display_name ilike '%' || q || '%'
+      or p.public_id::text = q or p.special_id = q
+  ) select jsonb_build_object('total',(select count(*) from filtered),
+    'rows',coalesce((select jsonb_agg(to_jsonb(x) - 'ip' || jsonb_build_object('ip',host(x.ip)) order by x.last_seen desc)
+    from (select * from filtered order by last_seen desc limit least(greatest(p_limit,1),200) offset greatest(p_offset,0)) x),'[]')) into result;
+  return result;
+end; $$;
+
 -- Serialize device registration with bans/unbans; future reports add accounts to active device sources.
 create or replace function public.voli_link_reported_device() returns trigger
 language plpgsql security definer set search_path = '' as $$
@@ -197,9 +223,7 @@ begin
     brand = coalesce(excluded.brand,member_devices.brand),model = coalesce(excluded.model,member_devices.model),
     os = coalesce(excluded.os,member_devices.os),network = coalesce(excluded.network,member_devices.network),
     carrier = coalesce(excluded.carrier,member_devices.carrier),last_seen = now();
-  select jsonb_build_object('kind',b.kind,'value',b.value,'reason',b.reason,'code',b.code,'until',b.until) into account_ban
-  from public.voli_ban_accounts a join public.voli_bans b on b.id = a.ban_id where a.auth_id = me
-    and b.revoked_at is null and (b.until is null or b.until > now()) order by b.until desc nulls first,b.code limit 1;
+  account_ban := public.voli_account_ban_json(me);
   return coalesce(account_ban,public.voli_find_device_ban(ip,d,p_carrier));
 end; $$;
 
@@ -241,7 +265,7 @@ begin
   ) select jsonb_build_object('member',(select to_jsonb(a) from accounts a where auth_id = target),
     'accounts',coalesce((select jsonb_agg(to_jsonb(a) order by a.public_id) from accounts a),'[]'),
     'devices',coalesce((select jsonb_agg(to_jsonb(d) - 'ip' || jsonb_build_object('ip',host(d.ip),'display_name',p.display_name,'public_id',p.public_id,
-      'ban',public.voli_find_device_ban(d.ip,d.device_id,d.carrier)) order by d.last_seen desc)
+      'ban',coalesce(public.voli_account_ban_json(d.auth_id),public.voli_find_device_ban(d.ip,d.device_id,d.carrier))) order by d.last_seen desc)
       from own_devices d join public.profiles p on p.auth_id = d.auth_id),'[]')) into result;
   return result;
 end; $$;

@@ -270,7 +270,7 @@ export const BAN_KIND_LABELS: Record<BanKind, string> = { ip: 'IP', network: 'ش
 export type DeviceRow = {
   id: string; auth_id: string; device_id: string; ip: string | null; brand: string | null; model: string | null;
   os: string | null; network: string | null; carrier: string | null; first_seen: string; last_seen: string;
-  display_name: string | null; public_id: number | null; ban: { kind: BanKind; value: string; reason: string | null } | null;
+  display_name: string | null; public_id: number | null; ban: { kind: BanKind | 'account'; value: string; reason: string | null; code?: number } | null;
 };
 export type DeviceBanRow = { id: string; kind: BanKind; value: string; reason: string | null; created_at: string; by_name: string | null };
 export const DEVICES_PAGE = 50;
@@ -371,6 +371,7 @@ export const adminErrorMessage = (e: unknown) => {
     bad_value: 'قيمة الحظر مطلوبة',
     bad_address: 'عنوان IP أو نطاق الشبكة غير صحيح (مثال 185.12.0.0/16)',
     bad_days: 'عدد الأيام غير صحيح',
+    signin_ban_failed: 'تعذّر تطبيق منع الدخول؛ لم يُحفظ الحظر. تحقق من صلاحيات وظائف الحظر في قاعدة بيانات فولي',
     bad_source: 'نوع المنح غير صحيح',
     bad_special_id: 'ID المميز أرقام فقط ولا يبدأ بصفر (حتى 10 أرقام)',
     special_id_taken: 'هذا الرقم مستخدم ID لعضو آخر',

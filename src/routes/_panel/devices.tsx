@@ -57,7 +57,7 @@ function Devices() {
                 { title: "معرّف الجهاز", dataIndex: "device_id", ellipsis: true, width: 160 },
                 { title: "آخر ظهور", dataIndex: "last_seen", render: fmtDate },
                  { title: "أول ظهور", dataIndex: "first_seen", render: fmtDate },
-                 { title: "الحالة", render: (_, r) => r.ban ? <Tag color="red">محظور</Tag> : <Tag>نشط</Tag> },
+                 { title: "الحالة", render: (_, r) => r.ban ? <Tag color="red">محظور {r.ban.code ?? ''}</Tag> : <Tag>نشط</Tag> },
                  { title: "", fixed: "right", render: (_, r) => <Link to="/bans" search={{ kind: 'device', value: r.device_id }}><Button size="small" danger>حظر الجهاز وحساباته</Button></Link> },
               ]} />
     </PageContainer>
