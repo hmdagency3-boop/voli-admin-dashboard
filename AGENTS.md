@@ -28,3 +28,8 @@ use the editor.
   own key and store it in Secrets.
 - **Secrets.** Lovable manages them. Do not put secret values in the repo.
 <!-- LOVABLE:END -->
+
+- This is Voli's standalone admin console: it talks to Voli's database only through the admin_* database functions (role-checked there), never with a secret key — rules stay in Voli's database.
+- Gift pictures are uploaded straight to Voli's public `gift-art` storage bucket (write policy checks the admin role in the database), then saved through admin_create_gift / admin_set_gift_art; the database change ships as sql/013_gift_uploads.sql, run by the owner in Voli's SQL Editor, because this panel cannot change Voli's schema.
+- UI is Ant Design + Pro Components, Arabic RTL, rendered client-only after hydration (private tool, avoids antd SSR styling issues).
+- Official English congratulation notices (Voli Helper, ID 100) are written inside the admin_* grant functions in Voli's database (sql/014_admin_grant_notices.sql), never sent again from the panel, so each grant produces exactly one set of messages; src/lib/admin.ts mirrors the same wording only for previews and hand-sent notices (admin_send_notice).
