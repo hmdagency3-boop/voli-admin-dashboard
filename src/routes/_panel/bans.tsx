@@ -9,9 +9,9 @@ import { ALL_BAN_LABELS, createBan, DEVICES_PAGE, fmtDate, getBans, revokeBan, t
 
 export const Route = createFileRoute('/_panel/bans')({
   validateSearch: (search: Record<string, unknown>): { member?: string | undefined; kind?: UnifiedBanKind | undefined; value?: string | undefined } => ({
-    member: typeof search['member'] === 'string' ? search['member'] : undefined,
+    member: typeof search['member'] === 'string' || typeof search['member'] === 'number' ? String(search['member']) : undefined,
     kind: ['account', 'ip', 'network', 'device'].includes(String(search['kind'])) ? search['kind'] as UnifiedBanKind : undefined,
-    value: typeof search['value'] === 'string' ? search['value'] : undefined,
+    value: typeof search['value'] === 'string' || typeof search['value'] === 'number' ? String(search['value']) : undefined,
   }),
   head: pageHead('إدارة الحظر', 'حظر الحسابات والأجهزة والشبكات وIP بأكواد موحدة في فولي'),
   component: Bans,
