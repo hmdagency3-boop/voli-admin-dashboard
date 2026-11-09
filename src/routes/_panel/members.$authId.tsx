@@ -5,8 +5,8 @@ import { Alert, Button, Card, Col, Descriptions, Popconfirm, Row, Space, Table, 
 import { pageHead } from "@/components/meta";
 import { useAction, useLoad } from "@/components/hooks";
 import {
-  ACTION_LABELS, banMember, changeCoins, coinsNotice, describeAction, editProfile, fmt, fmtDate, getMember, grantVip, revokeVip,
-  roleNotice, setRole, setSpecialId, specialIdNotice, unbanMember,
+  ACTION_LABELS, changeCoins, coinsNotice, describeAction, editProfile, fmt, fmtDate, getMember, grantVip, revokeVip,
+  roleNotice, setRole, setSpecialId, specialIdNotice,
 } from "@/lib/admin";
 import { activeVipLevel, VIP_LEVELS } from "@/lib/vip";
 
@@ -43,13 +43,8 @@ function Member() {
           <ProFormText name="note" label="ملاحظة" />
           <VipNoticePreview />
         </ModalForm>,
-        m?.ban
-          ? <Popconfirm key="u" title="فك الحظر؟" onConfirm={() => act(() => unbanMember(authId), "تم فك الحظر", reload)}><Button>فك الحظر</Button></Popconfirm>
-          : <ModalForm key="b" title="حظر العضو" trigger={<Button danger>حظر</Button>}
-              onFinish={async (v: { days?: number; reason?: string }) => act(() => banMember(authId, v.days ?? null, v.reason), "تم حظر العضو", reload)}>
-              <ProFormDigit name="days" label="عدد الأيام (فارغ = نهائي)" min={1} fieldProps={{ precision: 0 }} />
-              <ProFormText name="reason" label="السبب" fieldProps={{ maxLength: 200 }} />
-            </ModalForm>,
+        <Link key="b" to="/bans" search={{ member: String(p.public_id) }}><Button danger>إدارة الحظر</Button></Link>,
+        <Link key="d" to="/devices" search={{ member: String(p.public_id) }}><Button>الحسابات والأجهزة المرتبطة</Button></Link>,
       ]}
     >
       {p && m && <Row gutter={[16, 16]}>

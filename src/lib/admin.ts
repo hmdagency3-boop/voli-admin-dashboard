@@ -270,7 +270,7 @@ export const BAN_KIND_LABELS: Record<BanKind, string> = { ip: 'IP', network: 'ش
 export type DeviceRow = {
   id: string; auth_id: string; device_id: string; ip: string | null; brand: string | null; model: string | null;
   os: string | null; network: string | null; carrier: string | null; first_seen: string; last_seen: string;
-  display_name: string | null; public_id: number | null; ban: { kind: BanKind; value: string; reason: string | null } | null;
+  display_name: string | null; public_id: number | null; ban: { kind: BanKind | 'account'; value: string; reason: string | null; code?: number } | null;
 };
 export type DeviceBanRow = { id: string; kind: BanKind; value: string; reason: string | null; created_at: string; by_name: string | null };
 export const DEVICES_PAGE = 50;
@@ -286,6 +286,33 @@ export const getDeviceBans = () => deviceRpc<DeviceBanRow[]>('admin_list_device_
 export const banDevice = (kind: BanKind, value: string, reason?: string) =>
   deviceRpc<string>('admin_device_ban', { p_kind: kind, p_value: value, p_reason: reason || null });
 export const unbanDevice = (id: string) => deviceRpc<void>('admin_device_unban', { p_id: id });
+export type UnifiedBanKind = BanKind | 'account';
+export const ALL_BAN_LABELS: Record<UnifiedBanKind, string> = { ...BAN_KIND_LABELS, account: 'حساب' };
+export type UnifiedBan = {
+  id: string; code: number; kind: UnifiedBanKind; value: string; reason: string | null;
+  created_at: string; until: string | null; revoked_at: string | null; active: boolean;
+  by_name: string | null; affected_accounts: number;
+};
+export type LinkedAccount = {
+  auth_id: string; public_id: number; special_id: string | null; display_name: string | null;
+  devices: string[]; ban_codes: number[];
+};
+export type DeviceConnections = { member: LinkedAccount | null; devices: DeviceRow[]; accounts: LinkedAccount[] };
+async function bansRpc<T>(fn: string, args: Record<string, unknown> = {}): Promise<T> {
+  const { data, error } = await supabase.rpc(fn, args);
+  if (error) throw missing(error.code) ? { hint: 'bans_missing' } : error;
+  return data as T;
+}
+export const getBans = (q: string, kind: string, status: string, page: number) =>
+  bansRpc<{ rows: UnifiedBan[]; total: number }>('admin_list_bans', {
+    p_q: q.trim() || null, p_kind: kind === 'all' ? null : kind, p_status: status,
+    p_limit: DEVICES_PAGE, p_offset: page * DEVICES_PAGE,
+  });
+export const createBan = (kind: UnifiedBanKind, value: string, days?: number, reason?: string) =>
+  bansRpc<number>('admin_create_ban', { p_kind: kind, p_value: value.trim(), p_days: days ?? null, p_reason: reason?.trim() || null });
+export const revokeBan = (id: string) => bansRpc<void>('admin_revoke_ban', { p_id: id });
+export const getDeviceConnections = (member: string) =>
+  bansRpc<DeviceConnections>('admin_device_connections', { p_member: member.trim() });
 /** Default network range for an IP: the /24 block (IPv4) or /48 (IPv6). */
 export function networkOf(ip: string): string {
   if (ip.includes(':')) return ip.split(':').slice(0, 3).join(':') + '::/48';
@@ -327,6 +354,7 @@ export function describeAction(action: string, d: Record<string, unknown>): stri
 
 export const adminErrorMessage = (e: unknown) => {
   const err = e as { hint?: string; code?: string; message?: string } | null;
+  if (err?.hint === 'bans_missing') return 'يجب تشغيل تحديث الحظر الموحد 016 في قاعدة بيانات فولي أولاً';
   if (err?.hint === 'devices_missing') return 'يجب تشغيل ملف الأجهزة 015 في قاعدة البيانات أولاً';
   if (err?.hint === 'notice_missing') return 'يجب تشغيل ملف الإشعارات 014 في قاعدة البيانات أولاً';
   if (missing(err?.code)) return 'يجب تشغيل ملف الإدارة 009 في قاعدة البيانات أولاً';
@@ -343,6 +371,7 @@ export const adminErrorMessage = (e: unknown) => {
     bad_value: 'قيمة الحظر مطلوبة',
     bad_address: 'عنوان IP أو نطاق الشبكة غير صحيح (مثال 185.12.0.0/16)',
     bad_days: 'عدد الأيام غير صحيح',
+    signin_ban_failed: 'تعذّر تطبيق منع الدخول؛ لم يُحفظ الحظر. تحقق من صلاحيات وظائف الحظر في قاعدة بيانات فولي',
     bad_source: 'نوع المنح غير صحيح',
     bad_special_id: 'ID المميز أرقام فقط ولا يبدأ بصفر (حتى 10 أرقام)',
     special_id_taken: 'هذا الرقم مستخدم ID لعضو آخر',
