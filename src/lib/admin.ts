@@ -265,6 +265,33 @@ export type LogRow = {
   admin_name: string | null; admin_public_id: number | null; target_id: string | null; target_name: string | null; target_public_id: number | null;
 };
 export const LOG_PAGE = 50;
+export type BanKind = 'ip' | 'network' | 'device';
+export const BAN_KIND_LABELS: Record<BanKind, string> = { ip: 'IP', network: 'شبكة', device: 'جهاز' };
+export type DeviceRow = {
+  id: string; auth_id: string; device_id: string; ip: string | null; brand: string | null; model: string | null;
+  os: string | null; network: string | null; carrier: string | null; first_seen: string; last_seen: string;
+  display_name: string | null; public_id: number | null; ban: { kind: BanKind; value: string; reason: string | null } | null;
+};
+export type DeviceBanRow = { id: string; kind: BanKind; value: string; reason: string | null; created_at: string; by_name: string | null };
+export const DEVICES_PAGE = 50;
+/** Device functions come from sql/015_device_bans.sql. */
+async function deviceRpc<T>(fn: string, args: Record<string, unknown> = {}): Promise<T> {
+  const { data, error } = await supabase.rpc(fn, args);
+  if (error) throw missing(error.code) ? { hint: 'devices_missing' } : error;
+  return data as T;
+}
+export const getDevices = (q: string, page: number) =>
+  deviceRpc<{ total: number; rows: DeviceRow[] }>('admin_list_devices', { p_q: q || null, p_limit: DEVICES_PAGE, p_offset: page * DEVICES_PAGE });
+export const getDeviceBans = () => deviceRpc<DeviceBanRow[]>('admin_list_device_bans');
+export const banDevice = (kind: BanKind, value: string, reason?: string) =>
+  deviceRpc<string>('admin_device_ban', { p_kind: kind, p_value: value, p_reason: reason || null });
+export const unbanDevice = (id: string) => deviceRpc<void>('admin_device_unban', { p_id: id });
+/** Default network range for an IP: the /24 block (IPv4) or /48 (IPv6). */
+export function networkOf(ip: string): string {
+  if (ip.includes(':')) return ip.split(':').slice(0, 3).join(':') + '::/48';
+  const p = ip.split('.'); return p.length === 4 ? `${p[0]}.${p[1]}.${p[2]}.0/24` : ip;
+}
+
 export const getLog = (page: number) => rpc<LogRow[]>('admin_actions_log', { p_limit: LOG_PAGE, p_offset: page * LOG_PAGE });
 
 export const ACTION_LABELS: Record<string, string> = {
@@ -272,6 +299,7 @@ export const ACTION_LABELS: Record<string, string> = {
   profile: 'تعديل بيانات', ban: 'حظر', unban: 'فك حظر', room_close: 'إغلاق غرفة', room_chat_clear: 'مسح محادثة غرفة',
   gift_update: 'تعديل هدية', gift_create: 'إضافة هدية', gift_art: 'صورة هدية', vip_tier_update: 'سعر VIP', agency_update: 'تعديل وكالة', agency_remove_host: 'إزالة مضيف من وكالة',
   agency_approve: 'قبول وكالة', agency_reject: 'رفض وكالة', notice: 'إشعار رسمي',
+  device_ban: 'حظر جهاز/شبكة', device_unban: 'فك حظر جهاز/شبكة',
 };
 
 /** One-line Arabic summary of what an action changed. */
@@ -292,12 +320,14 @@ export function describeAction(action: string, d: Record<string, unknown>): stri
     case 'agency_approve': return `كود ${d['code']}`;
     case 'agency_reject': return d['reason'] ? String(d['reason']) : '';
     case 'notice': return String(d['body'] ?? '');
+    case 'device_ban': case 'device_unban': return `${BAN_KIND_LABELS[String(d['kind']) as BanKind] ?? ''}: ${d['value'] ?? ''}`;
     default: return '';
   }
 }
 
 export const adminErrorMessage = (e: unknown) => {
   const err = e as { hint?: string; code?: string; message?: string } | null;
+  if (err?.hint === 'devices_missing') return 'يجب تشغيل ملف الأجهزة 015 في قاعدة البيانات أولاً';
   if (err?.hint === 'notice_missing') return 'يجب تشغيل ملف الإشعارات 014 في قاعدة البيانات أولاً';
   if (missing(err?.code)) return 'يجب تشغيل ملف الإدارة 009 في قاعدة البيانات أولاً';
   if (err?.hint === 'bad_art_file') return err.message ?? 'الصورة غير صالحة';
@@ -309,6 +339,9 @@ export const adminErrorMessage = (e: unknown) => {
     bad_amount: 'المبلغ غير صحيح',
     negative_balance: 'لا يمكن أن يقل الرصيد عن الصفر',
     bad_level: 'مستوى VIP غير صحيح',
+    bad_kind: 'نوع الحظر غير صحيح',
+    bad_value: 'قيمة الحظر مطلوبة',
+    bad_address: 'عنوان IP أو نطاق الشبكة غير صحيح (مثال 185.12.0.0/16)',
     bad_days: 'عدد الأيام غير صحيح',
     bad_source: 'نوع المنح غير صحيح',
     bad_special_id: 'ID المميز أرقام فقط ولا يبدأ بصفر (حتى 10 أرقام)',
