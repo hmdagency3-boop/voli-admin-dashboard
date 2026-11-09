@@ -9,7 +9,7 @@ import {
 } from "@/lib/admin";
 import { activeVipLevel } from "@/lib/vip";
 
-export const Route = createFileRoute("/_panel/members/$authId")({
+export const Route = createFileRoute("/_panel/members/")({
   head: pageHead("بيانات عضو", "تفاصيل وإجراءات عضو في فولي"),
   component: Member,
 });
