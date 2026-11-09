@@ -10,7 +10,7 @@ import {
 } from "@/lib/admin";
 
 export const Route = createFileRoute("/_panel/devices")({
-  validateSearch: (search: Record<string, unknown>): { member?: string } => ({ member: typeof search.member === 'string' ? search.member : undefined }),
+  validateSearch: (search: Record<string, unknown>): { member?: string | undefined } => ({ member: typeof search['member'] === 'string' ? search['member'] : undefined }),
   head: pageHead("الأجهزة والحسابات المرتبطة", "سجل أجهزة أعضاء فولي والحسابات التي استخدمت نفس الأجهزة"),
   component: Devices,
 });

@@ -8,10 +8,10 @@ import { useAction, useLoad } from '@/components/hooks';
 import { ALL_BAN_LABELS, createBan, DEVICES_PAGE, fmtDate, getBans, revokeBan, type UnifiedBan, type UnifiedBanKind } from '@/lib/admin';
 
 export const Route = createFileRoute('/_panel/bans')({
-  validateSearch: (search: Record<string, unknown>): { member?: string; kind?: UnifiedBanKind; value?: string } => ({
-    member: typeof search.member === 'string' ? search.member : undefined,
-    kind: ['account', 'ip', 'network', 'device'].includes(String(search.kind)) ? search.kind as UnifiedBanKind : undefined,
-    value: typeof search.value === 'string' ? search.value : undefined,
+  validateSearch: (search: Record<string, unknown>): { member?: string | undefined; kind?: UnifiedBanKind | undefined; value?: string | undefined } => ({
+    member: typeof search['member'] === 'string' ? search['member'] : undefined,
+    kind: ['account', 'ip', 'network', 'device'].includes(String(search['kind'])) ? search['kind'] as UnifiedBanKind : undefined,
+    value: typeof search['value'] === 'string' ? search['value'] : undefined,
   }),
   head: pageHead('إدارة الحظر', 'حظر الحسابات والأجهزة والشبكات وIP بأكواد موحدة في فولي'),
   component: Bans,
@@ -59,7 +59,7 @@ function Bans() {
         { title: 'بواسطة', dataIndex: 'by_name', render: (v) => v ?? '—' },
         { title: 'التاريخ', dataIndex: 'created_at', render: fmtDate },
         { title: 'النهاية', dataIndex: 'until', render: (v) => v ? fmtDate(v) : 'دائم' },
-        { title: 'الحالة', render: (_, r) => <Tag color={r.active ? 'red' : undefined}>{r.active ? 'نشط' : r.revoked_at ? 'مفكوك' : 'منتهي'}</Tag> },
+        { title: 'الحالة', render: (_, r) => <Tag color={r.active ? 'red' : 'default'}>{r.active ? 'نشط' : r.revoked_at ? 'مفكوك' : 'منتهي'}</Tag> },
         { title: '', fixed: 'right', render: (_, r) => r.active && <Popconfirm title={`فك الحظر ${r.code}؟`} description="ستبقى أي أكواد حظر أخرى فعّالة على الحسابات نفسها." onConfirm={() => act(() => revokeBan(r.id), 'تم فك الحظر', bans.reload)}><Button size="small">فك الحظر</Button></Popconfirm> },
       ]} />
   </PageContainer>;
